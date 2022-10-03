@@ -1,2 +1,2 @@
 # JAX_VISR
-JAX Re-implementation of Hansen et al. 2020 "Variational Intrinsic Successor Features (VISR)" 
+JAX implementation of VISR (ICLR - Hansen et al. 2020)
