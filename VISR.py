@@ -49,9 +49,17 @@ parser.add_argument("--gpi", default=True, type=bool)
 parser.add_argument(
     "--game",
     default="Breakout",
-    choices=["Breakout", "Freeway", "SpaceInvaders", "Asterix",
-             "CartPole", "MountainCar", "FourRooms", "DeepSea",
-             "Catch"],
+    choices=[
+        "Breakout",
+        "Freeway",
+        "SpaceInvaders",
+        "Asterix",
+        "CartPole",
+        "MountainCar",
+        "FourRooms",
+        "DeepSea",
+        "Catch",
+    ],
     type=str,
 )
 parser.add_argument("--num_envs", default=16, type=int)
@@ -60,9 +68,13 @@ parser.add_argument("--num_rewarded_steps", default=100000, type=int)
 parser.add_argument("--seed", default=0, type=int)
 parser.add_argument("--recurrent", default=False, type=lambda x: bool(strtobool(x)))
 parser.add_argument("--lstm_size", default=128, type=int)
-parser.add_argument("--log_wandb", default = False, type = lambda x: bool(strtobool(x)))
-parser.add_argument("--wandb_entity", type = str, help = "user or group to log to if using wandb")
-parser.add_argument("--wandb_project", type = str, help = "project to log to if using wandb")
+parser.add_argument("--log_wandb", default=False, type=lambda x: bool(strtobool(x)))
+parser.add_argument(
+    "--wandb_entity", type=str, help="user or group to log to if using wandb"
+)
+parser.add_argument(
+    "--wandb_project", type=str, help="project to log to if using wandb"
+)
 
 
 args = parser.parse_args()
@@ -95,9 +107,10 @@ def training_loop(args, env, env_params):
 
     if log_wandb:
         import wandb
+
         entity = args.wandb_entity
         project = args.wandb_project
-        wandb.init(entity=entity, project=project, config = args)
+        wandb.init(entity=entity, project=project, config=args)
 
     w = jnp.zeros([1, num_envs, phi_dim])
     rng_key = jax.random.PRNGKey(args.seed)
@@ -109,7 +122,9 @@ def training_loop(args, env, env_params):
     init_w = init_w[jnp.newaxis]
     init_psi_obs = obs[jnp.newaxis]
 
-    phi_net, psi_net = utils.make_networks(game, recurrent, phi_dim, num_actions, lstm_size)
+    phi_net, psi_net = utils.make_networks(
+        game, recurrent, phi_dim, num_actions, lstm_size
+    )
     print(psi_net)
     print(phi_net)
 
@@ -169,8 +184,6 @@ def training_loop(args, env, env_params):
                 repeated_recurrent_state = repeat_nested_recurrent_state(
                     recurrent_state, n_samples + 1
                 )
-            # obs_cat = jnp.concatenate((jnp.repeat(obs[jnp.newaxis],n_samples+1, axis = 0), w_gpi), -1)
-            # TODO need to unpack the recurrent state, repeat, and repack
 
             psi, _ = psi_net.apply(
                 psi_state.params,
@@ -213,8 +226,6 @@ def training_loop(args, env, env_params):
     ):
 
         # cleanrl formulation of a DQN-style TD update
-
-        # the obs passed to psi nets need to be cat with w
         def phi_exp_loss(phi_params):
             phi = phi_net.apply(phi_params, next_obs)
             # normalise_phi_vmap = jax.vmap(normalise_phi)
@@ -253,7 +264,7 @@ def training_loop(args, env, env_params):
                 psi_params, obs, w, recurrent_state
             )  # (batch_size, num_actions)
             psi = psi.reshape(obs.shape[0], -1, phi_dim)
-            psi = psi[np.arange(psi.shape[0]), actions.squeeze(), ...]  # (batch_size,)
+            psi = psi[np.arange(psi.shape[0]), actions.squeeze(), ...]
             body_fun = (
                 lambda i, psi_loss: psi_loss
                 + ((psi[:, i] - jax.lax.stop_gradient(target_psi[:, i])) ** 2).mean()
@@ -295,9 +306,9 @@ def training_loop(args, env, env_params):
             gpi_psi, next_recurrent_state = gpi_act(
                 psi_state, obs, w, recurrent_state, rng_net
             )
-            # greedy_a = get_gpi_action(gpi_psi, w)
-            random_action = jax.random.randint(rng, shape=(1,), minval=0, maxval=num_actions)
-            # action = jnp.where(np.random.rand(mb_size) > epsilon, greedy_a, jax.random.randint(rng, shape=(mb_size,), minval=0, maxval=num_a))
+            random_action = jax.random.randint(
+                rng, shape=(1,), minval=0, maxval=num_actions
+            )
             action = jax.lax.cond(
                 jax.random.uniform(action_key) > epsilon,
                 lambda gpi_psi, w: get_gpi_action(gpi_psi, w),
@@ -402,9 +413,9 @@ def training_loop(args, env, env_params):
             gpi_psi, next_recurrent_state = gpi_act(
                 psi_state, obs, w, recurrent_state, rng_net
             )
-            # greedy_a = get_gpi_action(gpi_psi, w)
-            random_action = jax.random.randint(rng, shape=(1,), minval=0, maxval=num_actions)
-            # action = jnp.where(np.random.rand(mb_size) > epsilon, greedy_a, jax.random.randint(rng, shape=(mb_size,), minval=0, maxval=num_a))
+            random_action = jax.random.randint(
+                rng, shape=(1,), minval=0, maxval=num_actions
+            )
             if eval_episode:
                 action = get_gpi_action(gpi_psi, w)
             else:
@@ -419,7 +430,6 @@ def training_loop(args, env, env_params):
             next_obs, next_state, reward, done, _ = env.step(
                 env_key, state, action, env_params
             )
-            # next_obs, next_state = jax.lax.cond(done, env.reset,  lambda done_key: (next_obs, next_state), done_key)
 
             new_cum_reward = cum_reward + reward * valid_mask
             new_valid_mask = valid_mask * (1 - done)
@@ -488,9 +498,7 @@ def training_loop(args, env, env_params):
         next_obs = next_obs.reshape(-1, *obs_shape)
         phi = phi_net.apply(phi_state.params, next_obs)
         phi = phi.reshape(-1, phi_dim)
-        phi = phi / (
-                jax.lax.max(jnp.sum(phi**2, -1, keepdims=True), 1e-12) ** (0.5)
-            )
+        phi = phi / (jax.lax.max(jnp.sum(phi**2, -1, keepdims=True), 1e-12) ** (0.5))
 
         reward = reward.reshape(-1, 1)
         # using solution from https://github.com/google/jax/issues/11433
@@ -502,8 +510,6 @@ def training_loop(args, env, env_params):
     jit_rollout = jax.vmap(
         jax.jit(rollout, static_argnums=7), in_axes=[0, 0, 0, 0, None, 0, None, None]
     )
-    # jit_rollout = jax.vmap(rollout, in_axes = [0, 0, 0, 0,  None,0, None, None])
-
 
     # don't vmap over w in episode - should be the same
     jit_episode = jax.vmap(
